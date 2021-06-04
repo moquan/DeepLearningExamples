@@ -343,6 +343,7 @@ class Decoder(nn.Module):
         attention_context = torch.zeros(
             B, self.encoder_embedding_dim, dtype=dtype, device=device)
 
+
         processed_memory = self.attention_layer.memory_layer(memory)
 
         return (attention_hidden, attention_cell, decoder_hidden,
@@ -716,9 +717,6 @@ class Tacotron2_Speaker_2_Stage(Tacotron2):
                  postnet_n_convolutions, decoder_no_early_stopping)
 
         self.speaker_embedding_dim  = 2048
-        self.speaker_embedding_file = '/home/dawna/tts/mw545/TorchTTS/DeepLearningExamples/PyTorch/SpeechSynthesis/CUED_Tacotron2/VCTK-Corpus/spk_embedding/dv_spk_dict.dat'
-        import pickle
-        self.speaker_embedding_dict = pickle.load(open(self.speaker_embedding_file, 'rb'))
 
         decoder_embedding_dim = encoder_embedding_dim + self.speaker_embedding_dim
         self.decoder = Decoder(n_mel_channels, n_frames_per_step,
@@ -731,26 +729,29 @@ class Tacotron2_Speaker_2_Stage(Tacotron2):
                                p_decoder_dropout,
                                not decoder_no_early_stopping)
 
-    def append_speaker_embedding(self, input_lengths, encoder_outputs):
+    def append_speaker_embedding_testing(self, input_lengths, encoder_outputs):
         '''
         TODO:
         1. check format of encoder_outputs
         2. find out how to get speaker_id e.g. inputs?
         3. testing: generate random number
         '''
-        speaker_embedding = torch.rand((16, torch.max(input_lengths), 2048), device='cuda')
-        print(encoder_outputs.size()) # torch.Size([16, 105, 512]); 105, input_lengths?
-        speaker_encoder_outputs = torch.cat((speaker_embedding,  encoder_outputs), 1)
+        speaker_embedding = torch.rand((encoder_outputs.size()[0], torch.max(input_lengths), self.speaker_embedding_dim), device='cuda')
+        speaker_encoder_outputs = torch.cat((speaker_embedding,  encoder_outputs), 2)
         return speaker_encoder_outputs
 
+    def append_speaker_embedding(self, spk_embed, encoder_outputs):
+        speaker_encoder_outputs = torch.cat((spk_embed,  encoder_outputs), 2)
+        return speaker_encoder_outputs        
+
     def forward(self, inputs):
-        inputs, input_lengths, targets, max_len, output_lengths = inputs
+        inputs, input_lengths, targets, max_len, output_lengths, spk_embed = inputs
         input_lengths, output_lengths = input_lengths.data, output_lengths.data
 
         embedded_inputs = self.embedding(inputs).transpose(1, 2)
 
         encoder_outputs = self.encoder(embedded_inputs, input_lengths)
-        speaker_encoder_outputs = self.append_speaker_embedding(input_lengths, encoder_outputs)
+        speaker_encoder_outputs = self.append_speaker_embedding(spk_embed, encoder_outputs)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             speaker_encoder_outputs, targets, memory_lengths=input_lengths)
@@ -764,10 +765,18 @@ class Tacotron2_Speaker_2_Stage(Tacotron2):
 
 
     def infer(self, inputs, input_lengths):
+        '''
+        TODO:
+        1. Need to append speaker embedding
+        2. Modify root/inference.py to include speaker embedding
+        '''
+        inputs, spk_embed = inputs
 
         embedded_inputs = self.embedding(inputs).transpose(1, 2)
+
         encoder_outputs = self.encoder.infer(embedded_inputs, input_lengths)
-        speaker_encoder_outputs = self.append_speaker_embedding(encoder_outputs)
+        speaker_encoder_outputs = self.append_speaker_embedding(spk_embed, encoder_outputs)
+        
         mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.infer(
             speaker_encoder_outputs, input_lengths)
 

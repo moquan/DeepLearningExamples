@@ -32,12 +32,18 @@ from waveglow.data_function import MelAudioLoader
 from tacotron2.data_function import batch_to_gpu as batch_to_gpu_tacotron2
 from waveglow.data_function import batch_to_gpu as batch_to_gpu_waveglow
 
+from tacotron2.data_function_speaker_2_stage import TextMelSpkLoader
+from tacotron2.data_function_speaker_2_stage import TextMelSpkCollate
+from tacotron2.data_function_speaker_2_stage import batch_to_gpu as batch_to_gpu_tacotron2_speaker_2_stage
+
 
 def get_collate_function(model_name, n_frames_per_step=1):
-    if model_name == 'Tacotron2' or model_name == 'Tacotron2_Speaker_2_Stage':
+    if model_name == 'Tacotron2':
         collate_fn = TextMelCollate(n_frames_per_step)
     elif model_name == 'WaveGlow':
         collate_fn = torch.utils.data.dataloader.default_collate
+    elif model_name == 'Tacotron2_Speaker_2_Stage':
+        collate_fn = TextMelSpkCollate(n_frames_per_step)
     else:
         raise NotImplementedError(
             "unknown collate function requested: {}".format(model_name))
@@ -46,10 +52,12 @@ def get_collate_function(model_name, n_frames_per_step=1):
 
 
 def get_data_loader(model_name, dataset_path, audiopaths_and_text, args):
-    if model_name == 'Tacotron2' or model_name == 'Tacotron2_Speaker_2_Stage':
+    if model_name == 'Tacotron2':
         data_loader = TextMelLoader(dataset_path, audiopaths_and_text, args)
     elif model_name == 'WaveGlow':
         data_loader = MelAudioLoader(dataset_path, audiopaths_and_text, args)
+    elif model_name == 'Tacotron2_Speaker_2_Stage':
+        data_loader = TextMelSpkLoader(dataset_path, audiopaths_and_text, args)
     else:
         raise NotImplementedError(
             "unknown data loader requested: {}".format(model_name))
@@ -58,10 +66,12 @@ def get_data_loader(model_name, dataset_path, audiopaths_and_text, args):
 
 
 def get_batch_to_gpu(model_name):
-    if model_name == 'Tacotron2' or model_name == 'Tacotron2_Speaker_2_Stage':
+    if model_name == 'Tacotron2':
         batch_to_gpu = batch_to_gpu_tacotron2
     elif model_name == 'WaveGlow':
         batch_to_gpu = batch_to_gpu_waveglow
+    elif model_name == 'Tacotron2_Speaker_2_Stage':
+        batch_to_gpu = batch_to_gpu_tacotron2_speaker_2_stage
     else:
         raise NotImplementedError(
             "unknown batch_to_gpu requested: {}".format(model_name))
